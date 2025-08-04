@@ -10,19 +10,19 @@ import org.simpletransfer.models.RemoteClient;
 import java.io.IOException;
 
 public class SftpRemoteClient implements RemoteClient {
-    private final Credentials creds;
+    private final Credentials credentials;
     private final SSHClient sshClient;
 
-    public SftpRemoteClient(Credentials creds){
-        this.creds = creds;
+    public SftpRemoteClient(Credentials credentials){
+        this.credentials = credentials;
         this.sshClient = new SSHClient();
     }
 
     @Override
     public void connect() throws IOException {
         sshClient.addHostKeyVerifier(new PromiscuousVerifier());
-        sshClient.connect(creds.hostname(), creds.port());
-        sshClient.authPassword(creds.hostname(), creds.password());
+        sshClient.connect(credentials.hostname(), credentials.port());
+        sshClient.authPassword(credentials.hostname(), credentials.password());
     }
 
     @Override
