@@ -6,8 +6,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.Credentials;
 import org.simpletransfer.models.RemoteClient;
+import org.simpletransfer.utils.Util;
 
 import java.io.*;
+import java.nio.file.Path;
+import java.util.Objects;
 
 public class FtpRemoteClient implements RemoteClient {
     private static final Logger logger = LogManager.getLogger();
@@ -48,29 +51,40 @@ public class FtpRemoteClient implements RemoteClient {
         return ftpClient.isConnected();
     }
 
+    @SuppressWarnings("LoggingSimilarMessage")
     @Override
-    public void upload(String localPath, String remotePath) throws IOException {
-        try(InputStream localFileStream = new FileInputStream(localPath)){
-            logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
-            ftpClient.storeFile(remotePath, localFileStream);
+    public void upload(Path localPath, Path remotePath) throws IOException {
+        File localFile = localPath.toFile();
+        if(localFile.isFile()){
+            try(InputStream localFileStream = new FileInputStream(localPath.toString())){
+                logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
+                ftpClient.storeFile(remotePath.resolve(localPath.getFileName()).toString(), localFileStream);
+            }
+        }else if(localFile.isDirectory()){
+            for (File file : Objects.requireNonNull(localFile.listFiles())) {
+                try(InputStream inputStream = new FileInputStream(file)){
+                    logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
+                    ftpClient.storeFile(remotePath.resolve(file.getName()).toString(), inputStream);
+                }
+            }
         }
     }
 
     @Override
-    public void download(String localPath, String remotePath) throws IOException {
+    public void download(Path localPath, Path remotePath) throws IOException {
         int downloadCount = 0;
         for(FTPFile ftpFile : ftpClient.listFiles()){
-            OutputStream fos = new FileOutputStream(localPath.concat("/").concat(ftpFile.getName().trim()));
-            if(ftpClient.retrieveFile(remotePath.concat("/").concat(ftpFile.getName()), fos)){
+            OutputStream fos = new FileOutputStream(localPath.resolve(ftpFile.getName().trim()).toString());
+            if(ftpClient.retrieveFile(remotePath.resolve(Path.of(ftpFile.getName().trim())).toString(), fos)){
                 downloadCount++;
                 fos.close();
-                if(!ftpClient.deleteFile(remotePath.concat("/").concat(ftpFile.getName()))){
-                    logger.error("Failed to delete {}", remotePath.concat("/").concat(ftpFile.getName()));
+                if(!ftpClient.deleteFile(remotePath.resolve(ftpFile.getName().trim()).toString())){
+                    logger.error("Failed to delete {}", remotePath.resolve(ftpFile.getName().trim()).toString());
                 }
             }else{
                 fos.close();
                 Util.deleteFile(localPath + "/" + ftpFile.getName().trim());
-                logger.error("Failed to download {}", remotePath.concat("/").concat(ftpFile.getName()));
+                logger.error("Failed to download {}", remotePath.resolve(ftpFile.getName().trim()).toString());
             }
             logger.info("Downloaded {} files from FTP {}", downloadCount, credentials.hostname());
         }

@@ -2,4 +2,4 @@ package org.simpletransfer.models;
 
 import java.util.List;
 
-public record Parent(List<ServerConfig> configCollection, int intervalInMinutes, int taskTimeoutInSeconds) {}
+public record Parent(List<ConfigGroups> configCollection, int intervalInMinutes, int taskTimeoutInSeconds) {}

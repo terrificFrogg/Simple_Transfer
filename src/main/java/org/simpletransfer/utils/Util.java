@@ -1,4 +1,4 @@
-package org.simpletransfer.services;
+package org.simpletransfer.utils;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -31,6 +31,25 @@ public class Util {
         }
     }
 
+    public static void createDir(Path inboundFolder, Path inboundFolderArchive, String name){
+        String folder_in = inboundFolder.toString().concat("\\").concat(name);
+        String folder_in_archive = inboundFolderArchive.toString().concat("\\").concat(name);
+
+        try{
+            Path dir_in = Path.of(folder_in);
+            if(!Files.exists(dir_in)){
+                Files.createDirectory(dir_in);
+            }
+
+            Path dir_in_archive = Path.of(folder_in_archive);
+            if(!Files.exists(dir_in_archive)){
+                Files.createDirectory(dir_in_archive);
+            }
+        } catch (IOException e) {
+            logger.error("Error creating directory: {}", e.getMessage());
+        }
+    }
+
     public static void printDefaultConfig(){
         logger.info("Saving default config file in application directory");
         PrintWriter printWriter = null;
@@ -45,7 +64,7 @@ public class Util {
                 "          \"username\": \"username1\",\n" +
                 "          \"password\": \"password1\"\n" +
                 "        },\n" +
-                "        \"remoteFolderName\": \"\\\\remoteFolderName\"\n" +
+                "        \"folderPath\": \"\\\\folderPath\"\n" +
                 "      },\n" +
                 "      \"destination\": [\n" +
                 "        {\n" +
@@ -56,7 +75,7 @@ public class Util {
                 "            \"username\": \"username2\",\n" +
                 "            \"password\": \"password2\"\n" +
                 "          },\n" +
-                "          \"remoteFolderName\": \"remoteFolderName\"\n" +
+                "          \"folderPath\": \"folderPath\"\n" +
                 "        },\n" +
                 "        {\n" +
                 "          \"connectionCreds\": {\n" +
@@ -66,7 +85,7 @@ public class Util {
                 "            \"username\": \"username3\",\n" +
                 "            \"password\": \"password3\"\n" +
                 "          },\n" +
-                "          \"remoteFolderName\": \"remoteFolderName\"\n" +
+                "          \"folderPath\": \"folderPath\"\n" +
                 "        }\n" +
                 "      ]\n" +
                 "    },\n" +
@@ -79,7 +98,7 @@ public class Util {
                 "          \"username\": \"username4\",\n" +
                 "          \"password\": \"password4\"\n" +
                 "        },\n" +
-                "        \"remoteFolderName\": \"\\\\remoteFolderName\"\n" +
+                "        \"folderPath\": \"\\\\folderPath\"\n" +
                 "      },\n" +
                 "      \"destination\": [\n" +
                 "        {\n" +
@@ -90,7 +109,7 @@ public class Util {
                 "            \"username\": \"username5\",\n" +
                 "            \"password\": \"password5\"\n" +
                 "          },\n" +
-                "          \"remoteFolderName\": \"remoteFolderName\"\n" +
+                "          \"folderPath\": \"folderPath\"\n" +
                 "        }\n" +
                 "      ]\n" +
                 "    },\n" +
@@ -103,7 +122,7 @@ public class Util {
                 "          \"username\": \"username6\",\n" +
                 "          \"password\": \"password6\"\n" +
                 "        },\n" +
-                "        \"remoteFolderName\": \"\\\\remoteFolderName\"\n" +
+                "        \"folderPath\": \"\\\\folderPath\"\n" +
                 "      },\n" +
                 "      \"destination\": [\n" +
                 "        {\n" +
@@ -114,7 +133,7 @@ public class Util {
                 "            \"username\": \"username7\",\n" +
                 "            \"password\": \"password7\"\n" +
                 "          },\n" +
-                "          \"remoteFolderName\": \"remoteFolderName\"\n" +
+                "          \"folderPath\": \"folderPath\"\n" +
                 "        }\n" +
                 "      ]\n" +
                 "    }\n" +

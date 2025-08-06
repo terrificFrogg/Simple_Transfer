@@ -1,3 +1,3 @@
 package org.simpletransfer.models;
 
-public record ServerConfig(Credentials credentials, String remoteFolderName) {}
+public record ServerConfig(Credentials credentials, String folderPath) {}

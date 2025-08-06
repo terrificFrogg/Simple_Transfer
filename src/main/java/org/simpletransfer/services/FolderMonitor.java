@@ -18,23 +18,26 @@ public class FolderMonitor {
 
     /**
      * Creates a WatchService and registers the given directory.
-     *
-     * @throws IOException If an I/O error occurs during setup.
      */
-    public FolderMonitor(String sourceDir) throws IOException {
-        this.watcher = FileSystems.getDefault().newWatchService();
-        this.monitoredDir = Paths.get(sourceDir);
+    public FolderMonitor(String sourceDir){
+        try{
+            this.watcher = FileSystems.getDefault().newWatchService();
+            this.monitoredDir = Paths.get(sourceDir);
 
-        // Validate monitored directory
-        if (!Files.exists(monitoredDir) || !Files.isDirectory(monitoredDir)) {
-            logger.error("Monitored path is not a valid directory: {}", monitoredDir);
-            throw new IllegalArgumentException("Monitored path is not a valid directory: " + monitoredDir);
+            // Validate monitored directory
+            if (!Files.exists(monitoredDir) || !Files.isDirectory(monitoredDir)) {
+                logger.error("Monitored path is not a valid directory: {}", monitoredDir);
+                throw new IllegalArgumentException("Monitored path is not a valid directory: " + monitoredDir);
+            }
+
+            // Register the monitored directory for ENTRY_CREATE events only
+            this.monitoredDir.register(watcher, ENTRY_CREATE);
+
+            logger.info("Monitoring directory for new files: '{}'", monitoredDir.toAbsolutePath());
+        } catch (IOException e) {
+            logger.error("Error initializing folder monitor. {}", e.getMessage());
+            throw new RuntimeException(e);
         }
-
-        // Register the monitored directory for ENTRY_CREATE events only
-        this.monitoredDir.register(watcher, ENTRY_CREATE);
-
-        logger.info("Monitoring directory for new files: '{}'", monitoredDir.toAbsolutePath());
     }
 
     /**
