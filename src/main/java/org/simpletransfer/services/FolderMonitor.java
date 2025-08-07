@@ -43,7 +43,7 @@ public class FolderMonitor {
     /**
      * Starts the continuous monitoring of the directory.
      */
-    public void startMonitoring(Consumer<Path> detectedFile) {
+    public void startMonitoring(Consumer<String> detectedFile) {
         while (true) {
             WatchKey key;
             try {
@@ -77,7 +77,7 @@ public class FolderMonitor {
                     // This is important because WatchService also fires events for directory creation
                     if (Files.isRegularFile(createdFilePath)) {
                         logger.info("[CREATED] Detected new file: {}", createdFilePath.toAbsolutePath());
-                        detectedFile.accept(createdFilePath);
+                        detectedFile.accept(createdFilePath.toAbsolutePath().toString());
                     }
                 }
             }
@@ -88,6 +88,14 @@ public class FolderMonitor {
                 logger.info("Watch key no longer valid. Monitored directory might have been deleted or unaccessible. Exiting monitoring.");
                 break;
             }
+        }
+    }
+
+    public void closeAll(){
+        try {
+            this.watcher.close();
+        } catch (IOException e) {
+            logger.error("Error while trying to close watcher: {}", e.getMessage());
         }
     }
 }

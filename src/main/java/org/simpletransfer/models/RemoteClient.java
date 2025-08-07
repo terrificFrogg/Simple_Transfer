@@ -2,11 +2,15 @@ package org.simpletransfer.models;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 
 public interface RemoteClient {
     void connect() throws IOException;
     void disconnect() throws IOException;
     boolean isConnected();
-    void upload(Path localPath, Path remotePath) throws IOException;
-    void download(Path localPath, Path remotePath) throws IOException;
+    void upload(String localPath, String remotePath) throws IOException;
+    void download(String localPath, String remotePath) throws IOException;
+    void createDirectory(Path directoryPath) throws IOException;
+    List<FileInfo> listContents(String path) throws IOException;
+    void delete(String path) throws IOException;
 }

@@ -31,9 +31,9 @@ public class Util {
         }
     }
 
-    public static void createDir(Path inboundFolder, Path inboundFolderArchive, String name){
-        String folder_in = inboundFolder.toString().concat("\\").concat(name);
-        String folder_in_archive = inboundFolderArchive.toString().concat("\\").concat(name);
+    public static void createDir(String inboundFolder, String inboundFolderArchive, String name){
+        String folder_in = inboundFolder.concat("\\").concat(name);
+        String folder_in_archive = inboundFolderArchive.concat("\\").concat(name);
 
         try{
             Path dir_in = Path.of(folder_in);

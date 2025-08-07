@@ -5,7 +5,6 @@ import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.*;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -48,7 +47,7 @@ public class SourceLocalTransfer implements Transfer {
 
                                     sftpRemoteClient.connect();
                                     if(sftpRemoteClient.isConnected()){
-                                        sftpRemoteClient.upload(sourcePath, Path.of(destination.folderPath()));
+                                        sftpRemoteClient.upload(sourcePath, destination.folderPath());
                                     }
                                 } catch (IOException e) {
                                     logger.error("Error on SourceLocalTransfer Upload for {}. Message: {}", credentials.hostname(), e.getMessage());
@@ -71,6 +70,8 @@ public class SourceLocalTransfer implements Transfer {
 
     @Override
     public void stopTransfer() {
+        folderMonitors.forEach(FolderMonitor::closeAll);
+
         sftpRemoteClients.forEach(a -> {
             try {
                 if(a.isConnected()) {
@@ -82,6 +83,5 @@ public class SourceLocalTransfer implements Transfer {
         });
 
         executorService.shutdown();
-        executorService.close();
     }
 }

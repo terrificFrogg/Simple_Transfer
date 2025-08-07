@@ -11,15 +11,13 @@ import org.simpletransfer.services.SourceLocalTransfer;
 import org.simpletransfer.utils.ConfigParser;
 import org.simpletransfer.utils.Util;
 
-import java.nio.file.Path;
-
 public class Main {
     public static void main(String[] args) {
         Main main = new Main();
     }
     private static final Logger logger = LogManager.getLogger();
-    private static final Path INBOUND_FOLDER = Path.of("Staging\\IN\\");
-    private static final Path INBOUND_FOLDER_ARCHIVE = Path.of("Staging\\IN_ARCHIVE\\");
+    private static final String INBOUND_FOLDER = "Staging\\IN\\";
+    private static final String INBOUND_FOLDER_ARCHIVE = "Staging\\IN_ARCHIVE\\";
 
     private final Parent config;
 

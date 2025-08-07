@@ -5,21 +5,27 @@ import org.apache.commons.net.ftp.FTPFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.Credentials;
+import org.simpletransfer.models.FileInfo;
+import org.simpletransfer.models.FileType;
 import org.simpletransfer.models.RemoteClient;
 import org.simpletransfer.utils.Util;
 
 import java.io.*;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class FtpRemoteClient implements RemoteClient {
     private static final Logger logger = LogManager.getLogger();
     private final Credentials credentials;
     private final FTPClient ftpClient;
+    private final List<FileInfo> fileInfos;
 
     public FtpRemoteClient(Credentials credentials){
         this.credentials = credentials;
         this.ftpClient = new FTPClient();
+        this.fileInfos = new ArrayList<>();
     }
 
     @Override
@@ -53,40 +59,71 @@ public class FtpRemoteClient implements RemoteClient {
 
     @SuppressWarnings("LoggingSimilarMessage")
     @Override
-    public void upload(Path localPath, Path remotePath) throws IOException {
-        File localFile = localPath.toFile();
+    public void upload(String localPath, String remotePath) throws IOException {
+        File localFile = new File(localPath);
         if(localFile.isFile()){
-            try(InputStream localFileStream = new FileInputStream(localPath.toString())){
+            try(InputStream localFileStream = new FileInputStream(localPath)){
                 logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
-                ftpClient.storeFile(remotePath.resolve(localPath.getFileName()).toString(), localFileStream);
+                ftpClient.storeFile(remotePath.concat("\\").concat(localFile.getName()), localFileStream);
             }
         }else if(localFile.isDirectory()){
             for (File file : Objects.requireNonNull(localFile.listFiles())) {
                 try(InputStream inputStream = new FileInputStream(file)){
                     logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
-                    ftpClient.storeFile(remotePath.resolve(file.getName()).toString(), inputStream);
+                    ftpClient.storeFile(remotePath.concat("\\").concat(file.getName()), inputStream);
                 }
             }
         }
     }
 
     @Override
-    public void download(Path localPath, Path remotePath) throws IOException {
+    public void download(String localPath, String remotePath) throws IOException {
         int downloadCount = 0;
         for(FTPFile ftpFile : ftpClient.listFiles()){
-            OutputStream fos = new FileOutputStream(localPath.resolve(ftpFile.getName().trim()).toString());
-            if(ftpClient.retrieveFile(remotePath.resolve(Path.of(ftpFile.getName().trim())).toString(), fos)){
+            OutputStream fos = new FileOutputStream(localPath.concat("\\").concat(ftpFile.getName()));
+            if(ftpClient.retrieveFile(ftpFile.getName(), fos)){
                 downloadCount++;
                 fos.close();
-                if(!ftpClient.deleteFile(remotePath.resolve(ftpFile.getName().trim()).toString())){
-                    logger.error("Failed to delete {}", remotePath.resolve(ftpFile.getName().trim()).toString());
+                if(!ftpClient.deleteFile(ftpFile.getName())){
+                    logger.error("Failed to delete {}", ftpFile.getName());
                 }
             }else{
                 fos.close();
                 Util.deleteFile(localPath + "/" + ftpFile.getName().trim());
-                logger.error("Failed to download {}", remotePath.resolve(ftpFile.getName().trim()).toString());
+                logger.error("Failed to download {}", ftpFile.getName());
             }
             logger.info("Downloaded {} files from FTP {}", downloadCount, credentials.hostname());
         }
     }
+
+    @Override
+    public void createDirectory(Path directoryPath) throws IOException {
+        ftpClient.makeDirectory(directoryPath.toString());
+    }
+
+    @Override
+    public List<FileInfo> listContents(String path) throws IOException {
+        if(isConnected()){
+            fileInfos.clear();
+            for (FTPFile ftpFile : ftpClient.listFiles(path)) {
+                if(ftpFile.isFile()){
+                    fileInfos.add(new FileInfo(ftpFile.getName(), ftpFile.getLink(), FileType.FILE));
+                }else if (ftpFile.isDirectory()){
+                    fileInfos.add(new FileInfo(ftpFile.getName(), ftpFile.getLink(), FileType.DIRECTORY));
+                }
+            }
+        }else{
+            logger.error("Not connected to {}", credentials.hostname());
+        }
+        return fileInfos;
+    }
+
+    @Override
+    public void delete(String path) throws IOException {
+        if(isConnected()){
+            ftpClient.deleteFile(path);
+        }
+    }
+
+
 }

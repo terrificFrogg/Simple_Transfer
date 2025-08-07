@@ -2,14 +2,9 @@ package org.simpletransfer.services;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.simpletransfer.models.ConfigGroups;
-import org.simpletransfer.models.RemoteClient;
-import org.simpletransfer.models.ServerConfig;
-import org.simpletransfer.models.Transfer;
-import org.simpletransfer.models.TransferTask;
+import org.simpletransfer.models.*;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -21,15 +16,15 @@ import java.util.concurrent.TimeUnit;
  * */
 public class SourceFTPTransfer implements Transfer {
     protected static final Logger logger = LogManager.getLogger();
-    private final Path baseInboundFolder;
-    private final Path baseInboundFolderArchive;
+    private final String baseInboundFolder;
+    private final String baseInboundFolderArchive;
     private final int intervalInMinutes;
     private ScheduledExecutorService scheduler;
     private final List<RemoteClient> sourceRemoteClients;
     private final List<RemoteClient> destinationRemoteClients;
     private final List<TransferTask> transferTasks;
 
-    public SourceFTPTransfer(Path baseInboundFolder, Path baseInboundFolderArchive, int intervalInMinutes){
+    public SourceFTPTransfer(String baseInboundFolder, String baseInboundFolderArchive, int intervalInMinutes){
         this.baseInboundFolder = baseInboundFolder;
         this.baseInboundFolderArchive = baseInboundFolderArchive;
         this.intervalInMinutes = intervalInMinutes;
@@ -38,7 +33,7 @@ public class SourceFTPTransfer implements Transfer {
         destinationRemoteClients = new ArrayList<>();
     }
 
-    public SourceFTPTransfer (Path inboundFolder, Path inboundFolderArchive){
+    public SourceFTPTransfer (String inboundFolder, String inboundFolderArchive){
         this(inboundFolder, inboundFolderArchive, 5);
     }
 
@@ -66,7 +61,7 @@ public class SourceFTPTransfer implements Transfer {
             try {
                 sourceRemoteClient.connect();
                 if(sourceRemoteClient.isConnected()){
-                    sourceRemoteClient.download(baseInboundFolder, Path.of(source.folderPath()));
+                    sourceRemoteClient.download(baseInboundFolder, source.folderPath());
 
                     for (ServerConfig destination : destinations) {
                         RemoteClient destinationRemoteClient = null;
@@ -80,7 +75,7 @@ public class SourceFTPTransfer implements Transfer {
                         if(destinationRemoteClient != null){
                             destinationRemoteClient.connect();
                             if(destinationRemoteClient.isConnected()){
-                                destinationRemoteClient.upload(baseInboundFolder, Path.of(destination.folderPath()));
+                                destinationRemoteClient.upload(baseInboundFolder.toString(), destination.folderPath());
                             }
                         }
                     }
