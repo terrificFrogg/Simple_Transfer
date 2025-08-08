@@ -38,15 +38,15 @@ public class Util {
         try{
             Path dir_in = Path.of(folder_in);
             if(!Files.exists(dir_in)){
-                Files.createDirectory(dir_in);
+                Files.createDirectories(dir_in);
             }
 
             Path dir_in_archive = Path.of(folder_in_archive);
             if(!Files.exists(dir_in_archive)){
-                Files.createDirectory(dir_in_archive);
+                Files.createDirectories(dir_in_archive);
             }
         } catch (IOException e) {
-            logger.error("Error creating directory: {}", e.getMessage());
+            logger.error("Error creating directory: ", e);
         }
     }
 

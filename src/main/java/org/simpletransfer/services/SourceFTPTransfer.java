@@ -5,6 +5,7 @@ import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.*;
 import org.simpletransfer.services.clients.FtpRemoteClient;
 import org.simpletransfer.services.clients.SftpRemoteClient;
+import org.simpletransfer.utils.Util;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -63,7 +64,8 @@ public class SourceFTPTransfer implements Transfer {
             try {
                 sourceRemoteClient.connect();
                 if(sourceRemoteClient.isConnected()){
-                    sourceRemoteClient.download(baseInboundFolder, source.folderPath());
+                    String sourceFolder = baseInboundFolder.concat("\\").concat(source.credentials().hostname());
+                    sourceRemoteClient.download(sourceFolder, source.folderPath());
 
                     for (ServerConfig destination : destinations) {
                         RemoteClient destinationRemoteClient = null;
@@ -77,7 +79,7 @@ public class SourceFTPTransfer implements Transfer {
                         if(destinationRemoteClient != null){
                             destinationRemoteClient.connect();
                             if(destinationRemoteClient.isConnected()){
-                                destinationRemoteClient.upload(baseInboundFolder.toString(), destination.folderPath());
+                                destinationRemoteClient.upload(sourceFolder, destination.folderPath());
                             }
                         }
                     }

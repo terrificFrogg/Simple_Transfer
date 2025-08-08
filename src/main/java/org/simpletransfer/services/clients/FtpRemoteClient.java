@@ -64,13 +64,13 @@ public class FtpRemoteClient implements RemoteClient {
             if(localFile.isFile()){
                 try(InputStream localFileStream = new FileInputStream(localPath)){
                     logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
-                    ftpClient.storeFile(remotePath.concat("\\").concat(localFile.getName()), localFileStream);
+                    ftpClient.storeFile(remotePath.concat("/").concat(localFile.getName()), localFileStream);
                 }
             }else if(localFile.isDirectory()){
                 for (File file : Objects.requireNonNull(localFile.listFiles())) {
                     try(InputStream inputStream = new FileInputStream(file)){
                         logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
-                        ftpClient.storeFile(remotePath.concat("\\").concat(file.getName()), inputStream);
+                        ftpClient.storeFile(remotePath.concat("/").concat(file.getName()), inputStream);
                     }
                 }
             }
@@ -81,14 +81,12 @@ public class FtpRemoteClient implements RemoteClient {
     public void download(String localPath, String remotePath) throws IOException {
         if(isConnected()){
             int downloadCount = 0;
-            for(FTPFile ftpFile : ftpClient.listFiles()){
+            for(FTPFile ftpFile : ftpClient.listFiles(remotePath)){
                 OutputStream fos = new FileOutputStream(localPath.concat("\\").concat(ftpFile.getName()));
-                if(ftpClient.retrieveFile(ftpFile.getName(), fos)){
+                if(ftpClient.retrieveFile(remotePath.concat("/").concat(ftpFile.getName()), fos)){
                     downloadCount++;
                     fos.close();
-                    if(!ftpClient.deleteFile(ftpFile.getName())){
-                        logger.error("Failed to delete {}", ftpFile.getName());
-                    }
+                    delete(remotePath.concat("/").concat(ftpFile.getName()));
                 }else{
                     fos.close();
                     Util.deleteFile(localPath + "/" + ftpFile.getName().trim());
@@ -128,7 +126,9 @@ public class FtpRemoteClient implements RemoteClient {
     @Override
     public void delete(String path) throws IOException {
         if(isConnected()){
-            ftpClient.deleteFile(path);
+            if(!ftpClient.deleteFile(path)){
+                logger.error("Failed to delete {}", path);
+            }
         }
     }
 

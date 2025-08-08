@@ -56,11 +56,11 @@ public class SftpRemoteClient implements RemoteClient {
                 File localFile = new File(localPath);
                 if(localFile.isFile()){
                     sftpClient.put(localFile.getAbsolutePath(), remotePath.concat("/").concat(localFile.getName()));
-                    logger.info("[{}] Uploaded {} to {}", credentials.hostname(), localFile.getName(), remotePath);
+                    logger.info("[{}] Uploaded '{}'", credentials.hostname(), localFile.getName());
                 }else if(localFile.isDirectory()){
                     for (File file : Objects.requireNonNull(localFile.listFiles())) {
                         sftpClient.put(file.getAbsolutePath(), remotePath.concat("/").concat(file.getName()));
-                        logger.info("[{}] Uploaded {} to {}", credentials.hostname(), file.getName(), remotePath);
+                        logger.info("[{}] Uploaded '{}'", credentials.hostname(), file.getName());
                     }
                 }
             }

@@ -9,6 +9,7 @@ import org.simpletransfer.models.Credentials;
 import org.simpletransfer.models.FileInfo;
 import org.simpletransfer.models.FileType;
 import org.simpletransfer.models.RemoteClient;
+import org.simpletransfer.services.ReUseFTPSClient;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -45,6 +46,10 @@ public class FtpsRemoteClient implements RemoteClient {
             logger.error("Failed to login");
             return;
         }
+        ftpsClient.setEnabledSessionCreation(false);
+        ftpsClient.setEndpointCheckingEnabled(false);
+        ftpsClient.setUseClientMode(true);
+
         ftpsClient.execPBSZ(0);
         ftpsClient.execPROT("P");
         ftpsClient.enterLocalPassiveMode();
