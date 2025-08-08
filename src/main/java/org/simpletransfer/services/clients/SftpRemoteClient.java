@@ -1,4 +1,4 @@
-package org.simpletransfer.services;
+package org.simpletransfer.services.clients;
 
 import net.schmizz.sshj.SSHClient;
 import net.schmizz.sshj.sftp.RemoteResourceInfo;
@@ -13,7 +13,6 @@ import org.simpletransfer.models.RemoteClient;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -52,15 +51,17 @@ public class SftpRemoteClient implements RemoteClient {
     @SuppressWarnings("LoggingSimilarMessage")
     @Override
     public void upload(String localPath, String remotePath) throws IOException {
-        try(SFTPClient sftpClient = sshClient.newSFTPClient()){
-            File localFile = new File(localPath);
-            if(localFile.isFile()){
-                sftpClient.put(localFile.getAbsolutePath(), remotePath.concat("/").concat(localFile.getName()));
-                logger.info("[{}] Uploaded {} to {}", credentials.hostname(), localFile.getName(), remotePath);
-            }else if(localFile.isDirectory()){
-                for (File file : Objects.requireNonNull(localFile.listFiles())) {
-                    sftpClient.put(file.getAbsolutePath(), remotePath.concat("/").concat(file.getName()));
-                    logger.info("[{}] Uploaded {} to {}", credentials.hostname(), file.getName(), remotePath);
+        if(isConnected()){
+            try(SFTPClient sftpClient = sshClient.newSFTPClient()){
+                File localFile = new File(localPath);
+                if(localFile.isFile()){
+                    sftpClient.put(localFile.getAbsolutePath(), remotePath.concat("/").concat(localFile.getName()));
+                    logger.info("[{}] Uploaded {} to {}", credentials.hostname(), localFile.getName(), remotePath);
+                }else if(localFile.isDirectory()){
+                    for (File file : Objects.requireNonNull(localFile.listFiles())) {
+                        sftpClient.put(file.getAbsolutePath(), remotePath.concat("/").concat(file.getName()));
+                        logger.info("[{}] Uploaded {} to {}", credentials.hostname(), file.getName(), remotePath);
+                    }
                 }
             }
         }
@@ -68,19 +69,23 @@ public class SftpRemoteClient implements RemoteClient {
 
     @Override
     public void download(String localPath, String remotePath) throws IOException {
-        try(SFTPClient sftpClient = sshClient.newSFTPClient()){
-            for (RemoteResourceInfo resourceInfo : sftpClient.ls(remotePath)) {
-                sftpClient.get(resourceInfo.getPath(), localPath);
-                sftpClient.rm(resourceInfo.getPath());
-                logger.info("Downloaded {} from {}", resourceInfo.getName(), credentials.hostname());
+        if(isConnected()){
+            try(SFTPClient sftpClient = sshClient.newSFTPClient()){
+                for (RemoteResourceInfo resourceInfo : sftpClient.ls(remotePath)) {
+                    sftpClient.get(resourceInfo.getPath(), localPath);
+                    sftpClient.rm(resourceInfo.getPath());
+                    logger.info("Downloaded {} from {}", resourceInfo.getName(), credentials.hostname());
+                }
             }
         }
     }
 
     @Override
-    public void createDirectory(Path directoryPath) throws IOException {
-        try(SFTPClient sftpClient = sshClient.newSFTPClient()){
-            sftpClient.mkdir("Testing");
+    public void createDirectory(String directoryPath) throws IOException {
+        if(isConnected()){
+            try(SFTPClient sftpClient = sshClient.newSFTPClient()){
+                sftpClient.mkdir(directoryPath);
+            }
         }
     }
 
