@@ -1,11 +1,7 @@
 package org.simpletransfer.services;
 
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.*;
-import org.simpletransfer.services.clients.FtpRemoteClient;
-import org.simpletransfer.services.clients.SftpRemoteClient;
-import org.simpletransfer.utils.Util;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -13,89 +9,73 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 /**
- * Transfers data for sources whose credential type is FTP or SFTP.
- * */
+ * Transfers data for sources whose credential type is FTP, SFTP, or FTPS.
+ */
 public class SourceFTPTransfer implements Transfer {
-    protected static final Logger logger = LogManager.getLogger();
+    private final Logger logger;
     private final String baseInboundFolder;
     private final String baseInboundFolderArchive;
     private final int intervalInMinutes;
-    private ScheduledExecutorService scheduler;
-    private final List<RemoteClient> sourceRemoteClients;
-    private final List<RemoteClient> destinationRemoteClients;
-    private final List<TransferTask> transferTasks;
+    private BiConsumer<List<String>, String> uploadedFilesConsumer;
+    private final RemoteClientFactory remoteClientFactory;
+    private final ScheduledExecutorService scheduler;
 
-    public SourceFTPTransfer(String baseInboundFolder, String baseInboundFolderArchive, int intervalInMinutes){
-        this.baseInboundFolder = baseInboundFolder;
-        this.baseInboundFolderArchive = baseInboundFolderArchive;
-        this.intervalInMinutes = intervalInMinutes;
-        sourceRemoteClients = new ArrayList<>();
-        transferTasks = new ArrayList<>();
-        destinationRemoteClients = new ArrayList<>();
-    }
+    private final List<RemoteClient> sourceRemoteClients = new ArrayList<>();
+    private final List<RemoteClient> destinationRemoteClients = new ArrayList<>();
+    private final List<TransferTask> transferTasks = new ArrayList<>();
 
-    public SourceFTPTransfer (String inboundFolder, String inboundFolderArchive){
-        this(inboundFolder, inboundFolderArchive, 5);
+    private SourceFTPTransfer(Builder builder) {
+        this.logger = builder.logger;
+        this.baseInboundFolder = builder.baseInboundFolder;
+        this.baseInboundFolderArchive = builder.baseInboundFolderArchive;
+        this.intervalInMinutes = builder.intervalInMinutes;
+        this.remoteClientFactory = builder.remoteClientFactory;
+        this.scheduler = builder.scheduler != null ? builder.scheduler : Executors.newScheduledThreadPool(4);
     }
 
     @Override
     public void startTransfer(List<ConfigGroups> configGroups) {
-        scheduler = Executors.newScheduledThreadPool(configGroups.size());
         for (ConfigGroups configGroup : configGroups) {
-            ServerConfig source = configGroup.source();
-            RemoteClient sourceRemoteClient = null;
-            switch (source.credentials().type()){
-                case FTP -> sourceRemoteClient = new FtpRemoteClient(source.credentials());
-
-                case SFTP -> sourceRemoteClient = new SftpRemoteClient(source.credentials());
-            }
+            RemoteClient sourceRemoteClient = remoteClientFactory.create(configGroup.source());
             sourceRemoteClients.add(sourceRemoteClient);
-            TransferTask transferTask = getTransferTask(sourceRemoteClient, source, configGroup.destinations());
-            transferTasks.add(transferTask);
-            dataTransferScheduler(transferTask);
-        }
 
+            TransferTask transferTask = getTransferTask(sourceRemoteClient, configGroup.source(), configGroup.destinations());
+            transferTasks.add(transferTask);
+            scheduleTask(transferTask);
+        }
     }
 
     private TransferTask getTransferTask(RemoteClient sourceRemoteClient, ServerConfig source, List<ServerConfig> destinations) {
         return () -> {
             try {
                 sourceRemoteClient.connect();
-                if(sourceRemoteClient.isConnected()){
-                    String sourceFolder = baseInboundFolder.concat("\\").concat(source.credentials().hostname());
+                if (sourceRemoteClient.isConnected()) {
+                    String sourceFolder = baseInboundFolder + "\\" + source.credentials().hostname();
                     sourceRemoteClient.download(sourceFolder, source.folderPath());
 
                     for (ServerConfig destination : destinations) {
-                        RemoteClient destinationRemoteClient = null;
-                        switch (destination.credentials().type()){
-                            case SFTP -> destinationRemoteClient = new SftpRemoteClient(destination.credentials());
-                            case FTP -> destinationRemoteClient = new FtpRemoteClient(destination.credentials());
-                        }
-
+                        RemoteClient destinationRemoteClient = remoteClientFactory.create(destination);
                         destinationRemoteClients.add(destinationRemoteClient);
 
-                        if(destinationRemoteClient != null){
-                            destinationRemoteClient.connect();
-                            if(destinationRemoteClient.isConnected()){
-                                destinationRemoteClient.upload(sourceFolder, destination.folderPath());
-                            }
+                        destinationRemoteClient.connect();
+                        if (destinationRemoteClient.isConnected()) {
+                            destinationRemoteClient.upload(sourceFolder, destination.folderPath());
                         }
                     }
                 }
             } catch (IOException e) {
-                logger.error("Error while trying to download from {}. Error Message: {}", source.credentials().hostname(), e.getMessage());
+                logger.error("Error while trying to transfer from {}. Message: {}", source.credentials().hostname(), e.getMessage());
             }
         };
     }
 
-    private void dataTransferScheduler(TransferTask transferTask){
+    private void scheduleTask(TransferTask transferTask) {
         scheduler.scheduleAtFixedRate(transferTask::run, 0, intervalInMinutes, TimeUnit.MINUTES);
     }
 
-
-    @SuppressWarnings("LoggingSimilarMessage")
     @Override
     public void stopTransfer() {
         scheduler.shutdown();
@@ -107,24 +87,71 @@ public class SourceFTPTransfer implements Transfer {
             scheduler.shutdownNow();
         }
 
-        sourceRemoteClients.forEach(source -> {
-            if(source.isConnected()){
-                try {
-                    source.disconnect();
-                } catch (IOException e) {
-                    logger.error("Error while disconnecting. Message: {}", e.getMessage());
-                }
-            }
-        });
+        closeAllClients(sourceRemoteClients);
+        closeAllClients(destinationRemoteClients);
+    }
 
-        destinationRemoteClients.forEach(dest -> {
-            if(dest.isConnected()){
+    private void closeAllClients(List<RemoteClient> clients) {
+        for (RemoteClient client : clients) {
+            if (client.isConnected()) {
                 try {
-                    dest.disconnect();
+                    client.disconnect();
                 } catch (IOException e) {
                     logger.error("Error while disconnecting. Message: {}", e.getMessage());
                 }
             }
-        });
+        }
+    }
+
+    /**
+     * Builder for SourceFTPTransfer
+     */
+    public static class Builder {
+        private Logger logger;
+        private String baseInboundFolder;
+        private String baseInboundFolderArchive;
+        private int intervalInMinutes = 5;
+        private RemoteClientFactory remoteClientFactory;
+        private ScheduledExecutorService scheduler;
+
+        public Builder withLogger(Logger logger){
+            this.logger = logger;
+            return this;
+        }
+
+        public Builder withBaseInboundFolder(String folder) {
+            this.baseInboundFolder = folder;
+            return this;
+        }
+
+        public Builder withBaseInboundFolderArchive(String folderArchive) {
+            this.baseInboundFolderArchive = folderArchive;
+            return this;
+        }
+
+        public Builder withIntervalInMinutes(int minutes) {
+            this.intervalInMinutes = minutes;
+            return this;
+        }
+
+        public Builder withRemoteClientFactory(RemoteClientFactory factory) {
+            this.remoteClientFactory = factory;
+            return this;
+        }
+
+        public Builder withScheduler(ScheduledExecutorService scheduler) {
+            this.scheduler = scheduler;
+            return this;
+        }
+
+        public SourceFTPTransfer build() {
+            if (baseInboundFolder == null || baseInboundFolderArchive == null) {
+                throw new IllegalStateException("Base inbound folder and archive folder must be set.");
+            }
+            if (remoteClientFactory == null) {
+                throw new IllegalStateException("RemoteClientFactory must be set.");
+            }
+            return new SourceFTPTransfer(this);
+        }
     }
 }

@@ -1,54 +1,78 @@
 package org.simpletransfer.services;
 
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.*;
-import org.simpletransfer.services.clients.SftpRemoteClient;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Transfers data for sources whose credential type is Local.
  * */
 public class SourceLocalTransfer implements Transfer {
-    protected static final Logger logger = LogManager.getLogger();
+    private final Logger logger;
     private final List<FolderMonitor> folderMonitors;
-    private final List<SftpRemoteClient> sftpRemoteClients;
+    private final List<RemoteClient> remoteClients;
     private final List<Callable<Void>> callableList;
-    private ExecutorService executorService;
+    private final ExecutorService executorService;
+    private final RemoteClientFactory remoteClientFactory;
 
-    public SourceLocalTransfer(){
+    private SourceLocalTransfer(Builder builder){
         folderMonitors = new ArrayList<>();
-        sftpRemoteClients = new ArrayList<>();
+        remoteClients = new ArrayList<>();
         callableList = new ArrayList<>();
+        this.executorService = builder.executorService;
+        this.remoteClientFactory = builder.remoteClientFactory;
+        this.logger = builder.logger;
+    }
+
+    public static class Builder{
+        private Logger logger;
+        private RemoteClientFactory remoteClientFactory;
+        private ExecutorService executorService;
+
+        public Builder withLogger(Logger logger){
+            this.logger = logger;
+            return this;
+        }
+
+        public Builder withRemoteClientFactory(RemoteClientFactory remoteClientFactory){
+            this.remoteClientFactory = remoteClientFactory;
+            return this;
+        }
+
+        public Builder withExecutorService(ExecutorService executorService){
+            this.executorService = executorService;
+            return this;
+        }
+
+        public SourceLocalTransfer build(){
+            return new SourceLocalTransfer(this);
+        }
     }
 
     @Override
     public void startTransfer(List<ConfigGroups> configGroups) {
-        executorService = Executors.newFixedThreadPool(configGroups.size());
         for (ConfigGroups configGroup : configGroups) {
             ServerConfig source = configGroup.source();
-            if(source.credentials().type().equals(CredentialType.LOCAL)){   //making sure we're dealing with local type
+            if(source.credentials().type().equals(CredentialType.LOCAL)){
                 FolderMonitor folderMonitor = new FolderMonitor(source.folderPath());
-                folderMonitors.add(folderMonitor); //add to list to keep object alive
+                folderMonitors.add(folderMonitor);
                 callableList.add(() -> {
-
                     folderMonitor.startMonitoring(sourcePath -> {
                         for (ServerConfig destination : configGroup.destinations()) {
                             Credentials credentials = destination.credentials();
                             if(credentials.type().equals(CredentialType.SFTP)){
                                 try {
-                                    SftpRemoteClient sftpRemoteClient = new SftpRemoteClient(credentials);
-                                    sftpRemoteClients.add(sftpRemoteClient); //add to list to keep object alive
+                                    RemoteClient remoteClient = remoteClientFactory.create(destination);
+                                    remoteClients.add(remoteClient);
 
-                                    sftpRemoteClient.connect();
-                                    if(sftpRemoteClient.isConnected()){
-                                        sftpRemoteClient.upload(sourcePath, destination.folderPath());
+                                    remoteClient.connect();
+                                    if(remoteClient.isConnected()){
+                                        remoteClient.upload(sourcePath, destination.folderPath());
                                     }
                                 } catch (IOException e) {
                                     logger.error("Error on SourceLocalTransfer Upload for {}. Message: {}", credentials.hostname(), e.getMessage());
@@ -72,8 +96,7 @@ public class SourceLocalTransfer implements Transfer {
     @Override
     public void stopTransfer() {
         folderMonitors.forEach(FolderMonitor::closeAll);
-
-        sftpRemoteClients.forEach(a -> {
+        remoteClients.forEach(a -> {
             try {
                 if(a.isConnected()) {
                     a.disconnect();

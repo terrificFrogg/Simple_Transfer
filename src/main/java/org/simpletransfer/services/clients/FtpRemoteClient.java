@@ -2,7 +2,6 @@ package org.simpletransfer.services.clients;
 
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.Credentials;
 import org.simpletransfer.models.FileInfo;
@@ -11,20 +10,65 @@ import org.simpletransfer.models.RemoteClient;
 import org.simpletransfer.utils.Util;
 
 import java.io.*;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class FtpRemoteClient implements RemoteClient {
-    private static final Logger logger = LogManager.getLogger();
-    private final Credentials credentials;
+    private final Logger logger;
     private final FTPClient ftpClient;
+    private final Credentials credentials;
     private final List<FileInfo> fileInfos;
+    private BiConsumer<List<String>, String> uploadedFilesConsumer;
 
-    public FtpRemoteClient(Credentials credentials){
-        this.credentials = credentials;
-        this.ftpClient = new FTPClient();
-        this.fileInfos = new ArrayList<>();
+    public FtpRemoteClient(FtpRemoteClient.Builder builder){
+        this.logger = builder.logger;
+        this.ftpClient = builder.ftpClient;
+        this.credentials = builder.credentials;
+        this.fileInfos = builder.fileInfos;
+        this.uploadedFilesConsumer = builder.uploadedFilesConsumer;
+    }
+
+    public static FtpRemoteClient.Builder builder(){
+        return new FtpRemoteClient.Builder();
+    }
+
+    public static class Builder{
+        private Credentials credentials;
+        private FTPClient ftpClient;
+        private List<FileInfo> fileInfos;
+        private BiConsumer<List<String>, String> uploadedFilesConsumer;
+        private Logger logger;
+
+        public FtpRemoteClient.Builder withCredentials(Credentials credentials){
+            this.credentials = credentials;
+            return this;
+        }
+
+        public FtpRemoteClient.Builder withFTPClient(FTPClient ftpClient){
+            this.ftpClient = ftpClient;
+            return this;
+        }
+
+        public FtpRemoteClient.Builder withFileInfos(List<FileInfo> fileInfos){
+            this.fileInfos = fileInfos;
+            return this;
+        }
+
+        public FtpRemoteClient.Builder withConsumer(BiConsumer<List<String>, String> uploadedFilesConsumer){
+            this.uploadedFilesConsumer = uploadedFilesConsumer;
+            return this;
+        }
+
+        public FtpRemoteClient.Builder withLogger(Logger logger){
+            this.logger = logger;
+            return this;
+        }
+
+        public FtpRemoteClient build(){
+            return new FtpRemoteClient(this);
+        }
     }
 
     @Override

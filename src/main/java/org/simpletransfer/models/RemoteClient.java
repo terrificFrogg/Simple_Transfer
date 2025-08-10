@@ -1,5 +1,7 @@
 package org.simpletransfer.models;
 
+import org.simpletransfer.services.clients.FtpRemoteClient;
+
 import java.io.IOException;
 import java.util.List;
 

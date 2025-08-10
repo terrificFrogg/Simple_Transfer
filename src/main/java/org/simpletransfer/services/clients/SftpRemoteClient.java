@@ -16,17 +16,76 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class SftpRemoteClient implements RemoteClient {
-    protected static final Logger logger = LogManager.getLogger();
+    private final Logger logger;
     private final Credentials credentials;
     private final SSHClient sshClient;
     private final List<FileInfo> fileInfos;
+    private final BiConsumer<List<String>, String> uploadedFilesConsumer;
+    private final List<String> uploadedFiles;
 
-    public SftpRemoteClient(Credentials credentials){
-        this.credentials = credentials;
-        this.sshClient = new SSHClient();
-        this.fileInfos = new ArrayList<>();
+    public SftpRemoteClient(Builder builder){
+        this.logger = builder.logger;
+        this.credentials = builder.credentials;
+        this.sshClient = builder.sshClient;
+        this.fileInfos = builder.fileInfos;
+        this.uploadedFilesConsumer = builder.uploadedFilesConsumer;
+        this.uploadedFiles = new ArrayList<>();
+    }
+
+    public static Builder builder(){
+        return new Builder();
+    }
+
+    public static class Builder{
+        private Logger logger;
+        private Credentials credentials;
+        private SSHClient sshClient;
+        private List<FileInfo> fileInfos;
+        private BiConsumer<List<String>, String> uploadedFilesConsumer;
+
+
+        public Builder(Logger logger, Credentials credentials, SSHClient sshClient, List<FileInfo> fileInfos, BiConsumer<List<String>, String> uploadedFilesConsumer) {
+            this.logger = logger;
+            this.credentials = credentials;
+            this.sshClient = sshClient;
+            this.fileInfos = fileInfos;
+            this.uploadedFilesConsumer = uploadedFilesConsumer;
+        }
+
+        public Builder(){}
+
+        public Builder withLogger(Logger logger){
+            this.logger = logger;
+            return this;
+        }
+
+        public Builder withCredentials(Credentials credentials){
+            this.credentials = credentials;
+            return this;
+        }
+
+        public Builder withSSHClient(SSHClient sshClient){
+            this.sshClient = sshClient;
+            return this;
+        }
+
+        public Builder withFileInfos(List<FileInfo> fileInfos){
+            this.fileInfos = fileInfos;
+            return this;
+        }
+
+        public Builder withConsumer(BiConsumer<List<String>, String> uploadedFilesConsumer){
+            this.uploadedFilesConsumer = uploadedFilesConsumer;
+            return this;
+        }
+
+        public SftpRemoteClient build(){
+            return new SftpRemoteClient(this);
+        }
     }
 
     @Override
@@ -53,16 +112,21 @@ public class SftpRemoteClient implements RemoteClient {
     public void upload(String localPath, String remotePath) throws IOException {
         if(isConnected()){
             try(SFTPClient sftpClient = sshClient.newSFTPClient()){
+                uploadedFiles.clear();
                 File localFile = new File(localPath);
                 if(localFile.isFile()){
                     sftpClient.put(localFile.getAbsolutePath(), remotePath.concat("/").concat(localFile.getName()));
                     logger.info("[{}] Uploaded '{}'", credentials.hostname(), localFile.getName());
+                    uploadedFiles.add(localFile.getName());
                 }else if(localFile.isDirectory()){
                     for (File file : Objects.requireNonNull(localFile.listFiles())) {
                         sftpClient.put(file.getAbsolutePath(), remotePath.concat("/").concat(file.getName()));
                         logger.info("[{}] Uploaded '{}'", credentials.hostname(), file.getName());
+                        uploadedFiles.add(localFile.getName());
                     }
                 }
+                if(!uploadedFiles.isEmpty())
+                    uploadedFilesConsumer.accept(uploadedFiles, credentials.hostname());
             }
         }
     }

@@ -14,23 +14,64 @@ import org.simpletransfer.services.ReUseFTPSClient;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class FtpsRemoteClient implements RemoteClient {
-    protected static final Logger logger = LogManager.getLogger();
+    private final Logger logger;
     private final FTPSClient ftpsClient;
     private final Credentials credentials;
     private final List<FileInfo> fileInfos;
+    private BiConsumer<List<String>, String> uploadedFilesConsumer;
 
-    public FtpsRemoteClient(Credentials credentials, FTPSClient ftpsClient, List<FileInfo> fileInfos){
-        this.ftpsClient = ftpsClient;
-        this.credentials = credentials;
-        this.fileInfos = fileInfos;
+    public FtpsRemoteClient(Builder builder){
+        this.logger = builder.logger;
+        this.ftpsClient = builder.ftpsClient;
+        this.credentials = builder.credentials;
+        this.fileInfos = builder.fileInfos;
+        this.uploadedFilesConsumer = builder.uploadedFilesConsumer;
     }
 
-    public FtpsRemoteClient(Credentials credentials){
-        this(credentials, new FTPSClient(false), new ArrayList<>());
+    public static Builder builder(){
+        return new Builder();
     }
 
+    public static class Builder{
+        private Credentials credentials;
+        private FTPSClient ftpsClient;
+        private List<FileInfo> fileInfos;
+        private BiConsumer<List<String>, String> uploadedFilesConsumer;
+        private Logger logger;
+
+        public Builder withCredentials(Credentials credentials){
+            this.credentials = credentials;
+            return this;
+        }
+
+        public Builder withFTPSClient(FTPSClient ftpsClient){
+            this.ftpsClient = ftpsClient;
+            return this;
+        }
+
+        public Builder withFileInfos(List<FileInfo> fileInfos){
+            this.fileInfos = fileInfos;
+            return this;
+        }
+
+        public Builder withConsumer(BiConsumer<List<String>, String> uploadedFilesConsumer){
+            this.uploadedFilesConsumer = uploadedFilesConsumer;
+            return this;
+        }
+
+        public Builder withLogger(Logger logger){
+            this.logger = logger;
+            return this;
+        }
+
+        public FtpsRemoteClient build(){
+            return new FtpsRemoteClient(this);
+        }
+    }
 
     @Override
     public void connect() throws IOException {
