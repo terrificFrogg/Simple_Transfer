@@ -3,19 +3,17 @@ package org.simpletransfer.services.clients;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPReply;
 import org.apache.commons.net.ftp.FTPSClient;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.Credentials;
 import org.simpletransfer.models.FileInfo;
 import org.simpletransfer.models.FileType;
 import org.simpletransfer.models.RemoteClient;
-import org.simpletransfer.services.ReUseFTPSClient;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 public class FtpsRemoteClient implements RemoteClient {
     private final Logger logger;
@@ -23,6 +21,7 @@ public class FtpsRemoteClient implements RemoteClient {
     private final Credentials credentials;
     private final List<FileInfo> fileInfos;
     private BiConsumer<List<String>, String> uploadedFilesConsumer;
+    private final List<String> uploadedFiles;
 
     public FtpsRemoteClient(Builder builder){
         this.logger = builder.logger;
@@ -30,6 +29,7 @@ public class FtpsRemoteClient implements RemoteClient {
         this.credentials = builder.credentials;
         this.fileInfos = builder.fileInfos;
         this.uploadedFilesConsumer = builder.uploadedFilesConsumer;
+        this.uploadedFiles = new ArrayList<>();
     }
 
     public static Builder builder(){
@@ -108,12 +108,28 @@ public class FtpsRemoteClient implements RemoteClient {
         return ftpsClient.isConnected();
     }
 
+    @SuppressWarnings("LoggingSimilarMessage")
     @Override
     public void upload(String localPath, String remotePath) throws IOException {
         if(isConnected()){
-            try(InputStream localFileStream = new FileInputStream(localPath)){
-                ftpsClient.storeFile(remotePath, localFileStream);
+            uploadedFiles.clear();
+            File localFile = new File(localPath);
+            if(localFile.isFile()){
+                try(InputStream localFileStream = new FileInputStream(localPath)){
+                    ftpsClient.storeFile(remotePath, localFileStream);
+                    logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
+                    uploadedFiles.add(localFile.getName());
+                }
+            }else if(localFile.isDirectory()){
+                for(File file : Objects.requireNonNull(localFile.listFiles())){
+                    try(InputStream localFileStream = new FileInputStream(file)){
+                        ftpsClient.storeFile(remotePath, localFileStream);
+                        logger.info("[{}] Uploading {} to {}", credentials.hostname(), file.getName(), remotePath);
+                        uploadedFiles.add(localFile.getName());
+                    }
+                }
             }
+            uploadedFilesConsumer.accept(uploadedFiles, credentials.hostname());
         }
     }
 

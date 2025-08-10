@@ -10,10 +10,10 @@ import org.simpletransfer.models.RemoteClient;
 import org.simpletransfer.utils.Util;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 public class FtpRemoteClient implements RemoteClient {
     private final Logger logger;
@@ -21,6 +21,7 @@ public class FtpRemoteClient implements RemoteClient {
     private final Credentials credentials;
     private final List<FileInfo> fileInfos;
     private BiConsumer<List<String>, String> uploadedFilesConsumer;
+    private final List<String> uploadedFiles;
 
     public FtpRemoteClient(FtpRemoteClient.Builder builder){
         this.logger = builder.logger;
@@ -28,6 +29,7 @@ public class FtpRemoteClient implements RemoteClient {
         this.credentials = builder.credentials;
         this.fileInfos = builder.fileInfos;
         this.uploadedFilesConsumer = builder.uploadedFilesConsumer;
+        this.uploadedFiles = new ArrayList<>();
     }
 
     public static FtpRemoteClient.Builder builder(){
@@ -104,20 +106,24 @@ public class FtpRemoteClient implements RemoteClient {
     @Override
     public void upload(String localPath, String remotePath) throws IOException {
         if(isConnected()){
+            uploadedFiles.clear();
             File localFile = new File(localPath);
             if(localFile.isFile()){
                 try(InputStream localFileStream = new FileInputStream(localPath)){
                     logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
                     ftpClient.storeFile(remotePath.concat("/").concat(localFile.getName()), localFileStream);
+                    uploadedFiles.add(localFile.getName());
                 }
             }else if(localFile.isDirectory()){
                 for (File file : Objects.requireNonNull(localFile.listFiles())) {
                     try(InputStream inputStream = new FileInputStream(file)){
                         logger.info("[{}] Uploading {} to {}", credentials.hostname(), localPath, remotePath);
                         ftpClient.storeFile(remotePath.concat("/").concat(file.getName()), inputStream);
+                        uploadedFiles.add(file.getName());
                     }
                 }
             }
+            uploadedFilesConsumer.accept(uploadedFiles, credentials.hostname());
         }
     }
 
