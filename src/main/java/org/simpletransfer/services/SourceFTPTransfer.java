@@ -6,6 +6,8 @@ import org.simpletransfer.models.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +16,7 @@ import java.util.function.BiConsumer;
 /**
  * Transfers data for sources whose credential type is FTP, SFTP, or FTPS.
  */
+@SuppressWarnings("LoggingSimilarMessage")
 public class SourceFTPTransfer implements Transfer {
     private final Logger logger;
     private final String baseInboundFolder;
@@ -24,7 +27,7 @@ public class SourceFTPTransfer implements Transfer {
     private final ScheduledExecutorService scheduler;
 
     private final List<RemoteClient> sourceRemoteClients = new ArrayList<>();
-    private final List<RemoteClient> destinationRemoteClients = new ArrayList<>();
+    private final Map<String, RemoteClient> destinationRemoteClients = new WeakHashMap<>();
     private final List<TransferTask> transferTasks = new ArrayList<>();
 
     private SourceFTPTransfer(Builder builder) {
@@ -57,8 +60,8 @@ public class SourceFTPTransfer implements Transfer {
                     sourceRemoteClient.download(sourceFolder, source.folderPath());
 
                     for (ServerConfig destination : destinations) {
-                        RemoteClient destinationRemoteClient = remoteClientFactory.create(destination);
-                        destinationRemoteClients.add(destinationRemoteClient);
+                        RemoteClient destinationRemoteClient = destinationRemoteClients.computeIfAbsent(destination.credentials().hostname(),
+                                _ -> remoteClientFactory.create(destination));
 
                         destinationRemoteClient.connect();
                         if (destinationRemoteClient.isConnected()) {
@@ -87,11 +90,21 @@ public class SourceFTPTransfer implements Transfer {
             scheduler.shutdownNow();
         }
 
-        closeAllClients(sourceRemoteClients);
-        closeAllClients(destinationRemoteClients);
+        closeAllSourceRemoteClients(sourceRemoteClients);
+        closeAllDestinationRemoteClients(destinationRemoteClients);
     }
 
-    private void closeAllClients(List<RemoteClient> clients) {
+    private void closeAllDestinationRemoteClients(Map<String, RemoteClient> destinationRemoteClients){
+        destinationRemoteClients.forEach((_ , v) -> {
+            try {
+                v.disconnect();
+            } catch (IOException e) {
+                logger.error("Error while disconnecting. Message: {}", e.getMessage());
+            }
+        });
+    }
+
+    private void closeAllSourceRemoteClients(List<RemoteClient> clients) {
         for (RemoteClient client : clients) {
             if (client.isConnected()) {
                 try {

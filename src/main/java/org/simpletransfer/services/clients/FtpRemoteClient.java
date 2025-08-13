@@ -20,7 +20,7 @@ public class FtpRemoteClient implements RemoteClient {
     private final FTPClient ftpClient;
     private final Credentials credentials;
     private final List<FileInfo> fileInfos;
-    private BiConsumer<List<String>, String> uploadedFilesConsumer;
+    private final BiConsumer<List<String>, String> uploadedFilesConsumer;
     private final List<String> uploadedFiles;
 
     public FtpRemoteClient(FtpRemoteClient.Builder builder){

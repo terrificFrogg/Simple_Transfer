@@ -2,10 +2,10 @@ package org.simpletransfer.services;
 
 import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.*;
+import org.simpletransfer.utils.Util;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 
@@ -15,14 +15,14 @@ import java.util.concurrent.ExecutorService;
 public class SourceLocalTransfer implements Transfer {
     private final Logger logger;
     private final List<FolderMonitor> folderMonitors;
-    private final List<RemoteClient> remoteClients;
+    private final Map<String, RemoteClient> remoteClients;
     private final List<Callable<Void>> callableList;
     private final ExecutorService executorService;
     private final RemoteClientFactory remoteClientFactory;
 
     private SourceLocalTransfer(Builder builder){
         folderMonitors = new ArrayList<>();
-        remoteClients = new ArrayList<>();
+        remoteClients = new WeakHashMap<>();
         callableList = new ArrayList<>();
         this.executorService = builder.executorService;
         this.remoteClientFactory = builder.remoteClientFactory;
@@ -59,24 +59,30 @@ public class SourceLocalTransfer implements Transfer {
         for (ConfigGroups configGroup : configGroups) {
             ServerConfig source = configGroup.source();
             if(source.credentials().type().equals(CredentialType.LOCAL)){
+                logger.info("Transfer for {}", source.credentials().hostname());
                 FolderMonitor folderMonitor = new FolderMonitor(source.folderPath());
                 folderMonitors.add(folderMonitor);
                 callableList.add(() -> {
                     folderMonitor.startMonitoring(sourcePath -> {
                         for (ServerConfig destination : configGroup.destinations()) {
                             Credentials credentials = destination.credentials();
-                            if(credentials.type().equals(CredentialType.SFTP)){
-                                try {
-                                    RemoteClient remoteClient = remoteClientFactory.create(destination);
-                                    remoteClients.add(remoteClient);
-
-                                    remoteClient.connect();
-                                    if(remoteClient.isConnected()){
-                                        remoteClient.upload(sourcePath, destination.folderPath());
+                            switch (credentials.type()){
+                                case FTP, FTPS, SFTP -> {
+                                    try {
+                                        RemoteClient remoteClient = remoteClients.computeIfAbsent(credentials.hostname(),
+                                                _ -> remoteClientFactory.create(destination));
+                                        remoteClient.connect();
+                                        if(remoteClient.isConnected()){
+                                            remoteClient.upload(sourcePath, destination.folderPath());
+                                        }
+                                    } catch (IOException e) {
+                                        logger.error("Error on SourceLocalTransfer Upload for {}. Message: {}", credentials.hostname(), e.getMessage());
                                     }
-                                } catch (IOException e) {
-                                    logger.error("Error on SourceLocalTransfer Upload for {}. Message: {}", credentials.hostname(), e.getMessage());
                                 }
+                                case LOCAL -> Util.moveFile(sourcePath, destination
+                                        .folderPath()
+                                        .concat("\\")
+                                        .concat(sourcePath.substring(sourcePath.lastIndexOf('\\') + 1)));
                             }
                         }
                     });
@@ -96,10 +102,10 @@ public class SourceLocalTransfer implements Transfer {
     @Override
     public void stopTransfer() {
         folderMonitors.forEach(FolderMonitor::closeAll);
-        remoteClients.forEach(a -> {
+        remoteClients.forEach((_, v) -> {
             try {
-                if(a.isConnected()) {
-                    a.disconnect();
+                if(v.isConnected()) {
+                    v.disconnect();
                 }
             } catch (IOException e) {
                 logger.error("Error while disconnecting. Message: {}", e.getMessage());
