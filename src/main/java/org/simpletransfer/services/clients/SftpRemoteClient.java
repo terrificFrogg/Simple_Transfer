@@ -91,12 +91,20 @@ public class SftpRemoteClient implements RemoteClient {
         sshClient.addHostKeyVerifier(new PromiscuousVerifier());
         sshClient.connect(credentials.hostname(), credentials.port());
         sshClient.authPassword(credentials.username(), credentials.password());
+        if(isConnected()){
+            logger.info("Connected to {}", credentials.hostname());
+        }else{
+            logger.info("Not connected to {}", credentials.hostname());
+        }
     }
 
     @Override
     public void disconnect() throws IOException {
         if(sshClient.isConnected()){
             sshClient.disconnect();
+            if(!isConnected()){
+                logger.info("Disconnected from {}", credentials.hostname());
+            }
         }
     }
 
@@ -109,6 +117,7 @@ public class SftpRemoteClient implements RemoteClient {
     @Override
     public void upload(String localPath, String remotePath) throws IOException {
         if(isConnected()){
+            logger.info("Starting download from {}", credentials.hostname());
             try(SFTPClient sftpClient = sshClient.newSFTPClient()){
                 uploadedFiles.clear();
                 File localFile = new File(localPath);
@@ -126,6 +135,9 @@ public class SftpRemoteClient implements RemoteClient {
                 if(!uploadedFiles.isEmpty())
                     uploadedFilesConsumer.accept(uploadedFiles, credentials.hostname());
             }
+            logger.info("Downloaded finished from {}", credentials.hostname());
+        }else{
+            logger.info("Not connected to {}", credentials.hostname());
         }
     }
 
@@ -179,5 +191,8 @@ public class SftpRemoteClient implements RemoteClient {
         }
     }
 
-
+    @Override
+    public String getHostName() {
+        return credentials.hostname();
+    }
 }

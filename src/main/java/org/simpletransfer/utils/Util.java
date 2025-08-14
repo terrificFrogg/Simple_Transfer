@@ -3,11 +3,13 @@ package org.simpletransfer.utils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
@@ -16,10 +18,18 @@ public class Util {
 
     public static void moveFile(String source, String destination){
         try {
-            Files.move(Path.of(source), Path.of(destination), REPLACE_EXISTING);
+            File sourceFile = new File(source);
+            Path destinationPath = Path.of(destination);
+            if(sourceFile.isDirectory()){
+                for (File file : Objects.requireNonNull(sourceFile.listFiles())) {
+                    if(file.isFile())
+                        Files.move(file.toPath(), destinationPath.resolve(file.getName()), REPLACE_EXISTING);
+                }
+            }else if(sourceFile.isFile()){
+                Files.move(sourceFile.toPath(), destinationPath.resolve(sourceFile.getName()), REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             logger.error(e);
-            //throw new RuntimeException(e);
         }
     }
 

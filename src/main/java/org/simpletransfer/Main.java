@@ -43,6 +43,8 @@ public class Main {
                         //I just can't be bothered to prevent this from happening in the first place
                         if(Files.exists(Path.of(in)) && Files.exists(Path.of(archive))){
                             Util.moveFile(in, archive);
+                        }else{
+                            logger.info("Skipped '{}' because it doesn't exist", in);
                         }
                     });
                 }

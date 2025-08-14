@@ -180,4 +180,9 @@ public class FtpsRemoteClient implements RemoteClient {
             ftpsClient.deleteFile(path);
         }
     }
+
+    @Override
+    public String getHostName() {
+        return credentials.hostname();
+    }
 }

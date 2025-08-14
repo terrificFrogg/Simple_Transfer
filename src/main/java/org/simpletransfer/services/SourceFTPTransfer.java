@@ -2,6 +2,7 @@ package org.simpletransfer.services;
 
 import org.apache.logging.log4j.Logger;
 import org.simpletransfer.models.*;
+import org.simpletransfer.utils.Util;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,27 +48,39 @@ public class SourceFTPTransfer implements Transfer {
 
             TransferTask transferTask = getTransferTask(sourceRemoteClient, configGroup.source(), configGroup.destinations());
             transferTasks.add(transferTask);
-            scheduleTask(transferTask);
         }
+        executeScheduledTasks();
     }
 
     private TransferTask getTransferTask(RemoteClient sourceRemoteClient, ServerConfig source, List<ServerConfig> destinations) {
         return () -> {
             try {
-                sourceRemoteClient.connect();
+                if(!sourceRemoteClient.isConnected())
+                    sourceRemoteClient.connect();
+
                 if (sourceRemoteClient.isConnected()) {
-                    String sourceFolder = baseInboundFolder + "\\" + source.credentials().hostname();
-                    sourceRemoteClient.download(sourceFolder, source.folderPath());
+                    String sourceStagingFolder = baseInboundFolder + "\\" + source.credentials().hostname();
+                    sourceRemoteClient.download(sourceStagingFolder, source.folderPath());
 
                     for (ServerConfig destination : destinations) {
-                        RemoteClient destinationRemoteClient = destinationRemoteClients.computeIfAbsent(destination.credentials().hostname(),
-                                _ -> remoteClientFactory.create(destination));
+                        switch (destination.credentials().type()){
+                            case SFTP, FTPS, FTP -> {
+                                RemoteClient destinationRemoteClient = destinationRemoteClients.computeIfAbsent(destination.credentials().hostname(),
+                                        _ -> remoteClientFactory.create(destination));
 
-                        destinationRemoteClient.connect();
-                        if (destinationRemoteClient.isConnected()) {
-                            destinationRemoteClient.upload(sourceFolder, destination.folderPath());
+                                if(!destinationRemoteClient.isConnected())
+                                    destinationRemoteClient.connect();
+
+                                if (destinationRemoteClient.isConnected()) {
+                                    destinationRemoteClient.upload(sourceStagingFolder, destination.folderPath());
+                                }
+                            }
+
+                            case LOCAL -> Util.moveFile(sourceStagingFolder, destination.folderPath());
                         }
                     }
+                }else{
+                    logger.error("Not connected to {}", sourceRemoteClient.getHostName());
                 }
             } catch (IOException e) {
                 logger.error("Error while trying to transfer from {}. Message: {}", source.credentials().hostname(), e.getMessage());
@@ -75,12 +88,14 @@ public class SourceFTPTransfer implements Transfer {
         };
     }
 
-    private void scheduleTask(TransferTask transferTask) {
-        scheduler.scheduleAtFixedRate(transferTask::run, 0, intervalInMinutes, TimeUnit.MINUTES);
+    private void executeScheduledTasks() {
+        scheduler.scheduleAtFixedRate(()-> transferTasks.forEach(TransferTask::run), 0, intervalInMinutes, TimeUnit.SECONDS);
     }
 
     @Override
     public void stopTransfer() {
+        closeAllSourceRemoteClients(sourceRemoteClients);
+        closeAllDestinationRemoteClients(destinationRemoteClients);
         scheduler.shutdown();
         try {
             if (!scheduler.awaitTermination(60, TimeUnit.SECONDS)) {
@@ -89,15 +104,13 @@ public class SourceFTPTransfer implements Transfer {
         } catch (InterruptedException e) {
             scheduler.shutdownNow();
         }
-
-        closeAllSourceRemoteClients(sourceRemoteClients);
-        closeAllDestinationRemoteClients(destinationRemoteClients);
     }
 
     private void closeAllDestinationRemoteClients(Map<String, RemoteClient> destinationRemoteClients){
-        destinationRemoteClients.forEach((_ , v) -> {
+        destinationRemoteClients.forEach((_ , client) -> {
             try {
-                v.disconnect();
+                client.disconnect();
+                logger.info("Disconnected from {}? {}", client.getHostName(), client.isConnected());
             } catch (IOException e) {
                 logger.error("Error while disconnecting. Message: {}", e.getMessage());
             }
@@ -109,6 +122,7 @@ public class SourceFTPTransfer implements Transfer {
             if (client.isConnected()) {
                 try {
                     client.disconnect();
+                    logger.info("Disconnected from {}? {}", client.getHostName(), client.isConnected());
                 } catch (IOException e) {
                     logger.error("Error while disconnecting. Message: {}", e.getMessage());
                 }

@@ -182,5 +182,8 @@ public class FtpRemoteClient implements RemoteClient {
         }
     }
 
-
+    @Override
+    public String getHostName() {
+        return credentials.hostname();
+    }
 }

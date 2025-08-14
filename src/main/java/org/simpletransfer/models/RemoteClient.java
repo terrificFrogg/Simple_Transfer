@@ -1,7 +1,5 @@
 package org.simpletransfer.models;
 
-import org.simpletransfer.services.clients.FtpRemoteClient;
-
 import java.io.IOException;
 import java.util.List;
 
@@ -14,4 +12,5 @@ public interface RemoteClient {
     void createDirectory(String directoryPath) throws IOException;
     List<FileInfo> listContents(String path) throws IOException;
     void delete(String path) throws IOException;
+    String getHostName();
 }
