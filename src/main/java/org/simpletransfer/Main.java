@@ -72,8 +72,8 @@ public class Main {
                         .Builder()
                         .withLogger(logger)
                         .withBaseInboundFolder(INBOUND_FOLDER)
-                        .withBaseInboundFolderArchive(INBOUND_FOLDER_ARCHIVE)
-                        .withIntervalInMinutes(10)
+                        .withInterval(config.interval())
+                        .withTimeUnit(config.timeUnit())
                         .withScheduler(Executors.newScheduledThreadPool(remoteSourceConfigGroups.size()))
                         .withRemoteClientFactory(new RemoteClientFactory(logger, fileMover, null, null, null))
                         .build();

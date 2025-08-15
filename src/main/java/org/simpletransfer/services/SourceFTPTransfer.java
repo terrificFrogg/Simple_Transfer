@@ -21,8 +21,8 @@ import java.util.function.BiConsumer;
 public class SourceFTPTransfer implements Transfer {
     private final Logger logger;
     private final String baseInboundFolder;
-    private final String baseInboundFolderArchive;
-    private final int intervalInMinutes;
+    private final int interval;
+    private final TimeUnit timeUnit;
     private BiConsumer<List<String>, String> uploadedFilesConsumer;
     private final RemoteClientFactory remoteClientFactory;
     private final ScheduledExecutorService scheduler;
@@ -34,8 +34,8 @@ public class SourceFTPTransfer implements Transfer {
     private SourceFTPTransfer(Builder builder) {
         this.logger = builder.logger;
         this.baseInboundFolder = builder.baseInboundFolder;
-        this.baseInboundFolderArchive = builder.baseInboundFolderArchive;
-        this.intervalInMinutes = builder.intervalInMinutes;
+        this.interval = builder.interval;
+        this.timeUnit = builder.timeUnit == null ? TimeUnit.MINUTES : builder.timeUnit;
         this.remoteClientFactory = builder.remoteClientFactory;
         this.scheduler = builder.scheduler != null ? builder.scheduler : Executors.newScheduledThreadPool(4);
     }
@@ -89,7 +89,7 @@ public class SourceFTPTransfer implements Transfer {
     }
 
     private void executeScheduledTasks() {
-        scheduler.scheduleAtFixedRate(()-> transferTasks.forEach(TransferTask::run), 0, intervalInMinutes, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(()-> transferTasks.forEach(TransferTask::run), 0, interval, timeUnit);
     }
 
     @Override
@@ -136,13 +136,18 @@ public class SourceFTPTransfer implements Transfer {
     public static class Builder {
         private Logger logger;
         private String baseInboundFolder;
-        private String baseInboundFolderArchive;
-        private int intervalInMinutes = 5;
+        private int interval = 5;
         private RemoteClientFactory remoteClientFactory;
         private ScheduledExecutorService scheduler;
+        private TimeUnit timeUnit;
 
         public Builder withLogger(Logger logger){
             this.logger = logger;
+            return this;
+        }
+
+        public Builder withTimeUnit(TimeUnit timeUnit){
+            this.timeUnit = timeUnit;
             return this;
         }
 
@@ -151,13 +156,8 @@ public class SourceFTPTransfer implements Transfer {
             return this;
         }
 
-        public Builder withBaseInboundFolderArchive(String folderArchive) {
-            this.baseInboundFolderArchive = folderArchive;
-            return this;
-        }
-
-        public Builder withIntervalInMinutes(int minutes) {
-            this.intervalInMinutes = minutes;
+        public Builder withInterval(int minutes) {
+            this.interval = minutes;
             return this;
         }
 
@@ -172,8 +172,8 @@ public class SourceFTPTransfer implements Transfer {
         }
 
         public SourceFTPTransfer build() {
-            if (baseInboundFolder == null || baseInboundFolderArchive == null) {
-                throw new IllegalStateException("Base inbound folder and archive folder must be set.");
+            if (baseInboundFolder == null) {
+                throw new IllegalStateException("Base inbound folder must be set.");
             }
             if (remoteClientFactory == null) {
                 throw new IllegalStateException("RemoteClientFactory must be set.");
